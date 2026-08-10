@@ -20,7 +20,6 @@
 ##### import necessary libraries #####
 
 import logging # import logging for debugging
-import threading
 
 ##### import necessary functions #####
 
@@ -33,8 +32,6 @@ from utilities.maestro import initialize_maestro # import maestro initialization
 ##### create maestro object #####
 
 MAESTRO = initialize_maestro() # create maestro object
-_MAESTRO_LOCK = threading.Lock()
-_SET_TARGET_LOG_REMAINING = 12  # log the first dozen writes at INFO for hardware bring-up
 
 
 
@@ -51,50 +48,24 @@ def set_target(channel, target, speed, acceleration): # function to set target p
 
     ##### move a servo to a desired position using its number and said position #####
 
-    global _SET_TARGET_LOG_REMAINING
     logging.debug(f"(servos.py): Attempting to move servo {channel} to target {target} with speed {speed} and acceleration {acceleration}...\n")
-
-    if not hasattr(MAESTRO, "write"):
-        logging.error(
-            f"(servos.py): Maestro handle is invalid ({type(MAESTRO)!r}); "
-            "serial open likely failed. Servo commands are no-ops.\n"
-        )
-        return
 
     try: # attempt to move desired servo
 
-        pwm_us = float(target)
-        # Target 0 disables the channel on Pololu Maestro — never send that for a pose.
-        if pwm_us < 500.0:
-            logging.error(
-                f"(servos.py): Refusing PWM {pwm_us:.1f} µs on ch {channel} "
-                "(<500 disables / is invalid). Check angle→PWM mapping.\n"
-            )
-            return
-
-        target_qus = int(round(pwm_us * 4)) # convert target from microseconds to quarter-microseconds
-        speed = max(0, min(16383, int(speed))) # ensure speed is within valid range
-        acceleration = max(0, min(255, int(acceleration))) # ensure acceleration is within valid range
+        target = int(round(target * 4)) # convert target from microseconds to quarter-microseconds
+        speed = max(0, min(16383, speed)) # ensure speed is within valid range
+        acceleration = max(0, min(255, acceleration)) # ensure acceleration is within valid range
         speed_command = bytearray([0x87, channel, speed & 0x7F, (speed >> 7) & 0x7F]) # create speed command
+        MAESTRO.write(speed_command) # send speed command to maestro
+
+        # create acceleration command
         accel_command = bytearray([0x89, channel, acceleration & 0x7F, (acceleration >> 7) & 0x7F])
-        command = bytearray([0x84, channel, target_qus & 0x7F, (target_qus >> 7) & 0x7F]) # create target position command
+        MAESTRO.write(accel_command) # send acceleration command to maestro
+        command = bytearray([0x84, channel, target & 0x7F, (target >> 7) & 0x7F]) # create target position command
+        MAESTRO.write(command) # send target position command to maestro
 
-        with _MAESTRO_LOCK:
-            MAESTRO.write(speed_command)
-            MAESTRO.write(accel_command)
-            MAESTRO.write(command)
-            if hasattr(MAESTRO, "flush"):
-                MAESTRO.flush()
-
-        if _SET_TARGET_LOG_REMAINING > 0:
-            _SET_TARGET_LOG_REMAINING -= 1
-            logging.info(
-                f"(servos.py): set_target ch={channel} pwm={pwm_us:.1f} µs "
-                f"speed={speed} accel={acceleration}\n"
-            )
-
-    except Exception as e:
-        logging.error(f"(servos.py): Failed to move servo ch={channel}: {e}\n")
+    except:
+        logging.error("(servos.py): Failed to move servo.\n") # print failure statement
 
 
 ########## ANGLE TO TARGET ##########
