@@ -171,7 +171,7 @@ LAN_TELEOP_CONFIG = {
 
 ##### robot top speed #####
 
-TOP_SPEED = 1.2 # in m/s (match Isaac Lab lin_vel_x/y command ranges)
+TOP_SPEED = 0.6 # in m/s
 
 ##### set dictionary of servos and their ranges #####
 
