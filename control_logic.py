@@ -311,8 +311,8 @@ def _lan_teleop_loop():
             if command and IS_COMPLETE:
                 logging.info(f"(control_logic.py): LAN command '{command}' (WILL RUN).\n")
                 threading.Thread(target=_handle_command, args=(command, None), daemon=True).start()
-            elif not command and IS_COMPLETE and not IS_NEUTRAL:
-                threading.Thread(target=_handle_command, args=('n', None), daemon=True).start()
+            # Desktop already sends 'n' on key-up. Do not auto-inject neutral here —
+            # it was racing every gait step and made the dog look "dead" / hung.
 
             time.sleep(0.02)
 
@@ -428,6 +428,9 @@ def _execute_keyboard_commands(keys, camera_frames, is_neutral, current_leg, int
         IMAGELESS_GAIT = not IMAGELESS_GAIT  # toggle imageless gait mode
         logging.warning(f"(control_logic.py): Toggled IMAGELESS_GAIT to {IMAGELESS_GAIT}\n")
         keys = [k for k in keys if k != 'i']  # remove 'i' from the keys list
+
+    # Desktop WASD+QE: map q/e onto the existing rotate keys.
+    keys = ["arrowleft" if k == "q" else "arrowright" if k == "e" else k for k in keys]
 
     ##### cancel out contradictory keys #####
 

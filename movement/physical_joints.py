@@ -178,3 +178,5 @@ def neutral_position_physical(intensity): # used to move all joints to neutral p
             
         except Exception as e: # if unable to move joint...
             logging.error(f"(physical_joints.py): Failed to move {leg_id}_{joint_name} to neutral: {e}\n")
+
+    logging.info("(physical_joints.py): Neutral command batch finished (check set_target PWM lines above).\n")

@@ -10,7 +10,7 @@
 
 Protocol (same framing as website backend):
   [4-byte big-endian length][UTF-8 command]
-Commands: w, s, a, d, w+a, arrowleft, arrowright, n, ...
+Commands: w, s, a, d, w+a, q, e, arrowleft, arrowright, n, ...
 """
 
 from __future__ import annotations

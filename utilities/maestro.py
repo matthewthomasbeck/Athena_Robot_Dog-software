@@ -55,11 +55,21 @@ def initialize_maestro( # function to initialize maestro serial connection
 
     logging.debug("(maestro.py): Attempting to establish connection with maestro...\n")
     MAESTRO = _establish_serial_connection(serial_path, serial_baud_rate, serial_timeout) # establish serial connection
+    if not hasattr(MAESTRO, "write"):
+        logging.error(
+            "(maestro.py): Serial open failed — refusing to continue with a dead Maestro handle. "
+            f"Check {serial_path}, wiring, and that nothing else owns the port.\n"
+        )
+        return MAESTRO
     _send_baud_rate_indication(MAESTRO) # send baud rate indication to maestro to establish communication
 
-    ##### disable servos to clear old state #####
-
-    _disable_all_servos(MAESTRO)
+    # Do NOT mass-disable (target=0) at startup. That goes limp; if later set_target
+    # fails (baud/power), the dog stays dead with no visual cue beyond "Disabled…".
+    # Pose code will write real PWMs immediately after init.
+    logging.info(
+        f"(maestro.py): Ready on {serial_path} @ {serial_baud_rate} baud "
+        "(servos will enable on first non-zero target).\n"
+    )
 
     return MAESTRO
 
@@ -124,11 +134,24 @@ def _disable_all_servos(maestro): # function to disable all servos at startup
 
         for channel in range(12): # iterate through all servo channels (0-11)
             maestro.write(bytearray([0x84, channel, 0, 0])) # send command to set target position to 0 (disabled)
+        if hasattr(maestro, "flush"):
+            maestro.flush()
 
         logging.info("(maestro.py): Disabled all servos at startup.\n")
 
     except Exception as e:
         logging.warning(f"(maestro.py): Failed to disable servos at startup: {e}")
+
+
+def enable_servos_to_targets(maestro, channel_pwm_us: dict):
+    """Re-enable channels by writing non-zero targets (µs). Target 0 = disabled on Maestro."""
+    for channel, pwm_us in channel_pwm_us.items():
+        target = int(round(float(pwm_us) * 4))
+        # Unlimited speed for a crisp wake-from-disable.
+        maestro.write(bytearray([0x87, int(channel), 0, 0]))
+        maestro.write(bytearray([0x84, int(channel), target & 0x7F, (target >> 7) & 0x7F]))
+    if hasattr(maestro, "flush"):
+        maestro.flush()
 
 
 ########## ATTEMPT SERIAL CLEANUP ##########
